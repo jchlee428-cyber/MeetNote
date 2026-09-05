@@ -184,7 +184,7 @@ export default function MinutesEditor({
   };
 
   return (
-    <div className="bg-white rounded-2xl p-6 sm:p-8 border-2 border-blue-200 shadow-sm max-w-4xl mx-auto my-6">
+    <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-8 border-2 border-blue-200 shadow-sm max-w-4xl mx-auto my-4 sm:my-6">
       <div className="flex items-center justify-between pb-4 border-b border-slate-200">
         <div>
           <h2 className="text-xl font-bold text-slate-900">회의록 수정</h2>
@@ -462,47 +462,9 @@ export default function MinutesEditor({
           </div>
           <div className="space-y-3">
             {minutes.actionItems.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-12 gap-2 p-3 bg-slate-50 rounded-xl border border-slate-200 items-center">
-                <div className="col-span-12 sm:col-span-5">
-                  <input
-                    type="text"
-                    value={item.task}
-                    onChange={(e) => handleActionItemChange(idx, 'task', e.target.value)}
-                    placeholder="업무 내용"
-                    className="w-full px-3 py-1.5 rounded-lg border border-slate-300 text-sm"
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                  <input
-                    type="text"
-                    value={item.assignee}
-                    onChange={(e) => handleActionItemChange(idx, 'assignee', e.target.value)}
-                    placeholder="담당자"
-                    className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm text-center"
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                  <input
-                    type="text"
-                    value={item.dueDate}
-                    onChange={(e) => handleActionItemChange(idx, 'dueDate', e.target.value)}
-                    placeholder="기한"
-                    className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm text-center"
-                  />
-                </div>
-                <div className="col-span-3 sm:col-span-2">
-                  <select
-                    value={item.status}
-                    onChange={(e) => handleActionItemChange(idx, 'status', e.target.value)}
-                    className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-sm bg-white"
-                  >
-                    <option value="예정">예정</option>
-                    <option value="진행중">진행중</option>
-                    <option value="완료">완료</option>
-                    <option value="보류">보류</option>
-                  </select>
-                </div>
-                <div className="col-span-1 text-center">
+              <div key={idx} className="p-3 sm:p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-600">업무 #{idx + 1}</span>
                   <button
                     type="button"
                     onClick={() => handleRemoveActionItem(idx)}
@@ -511,6 +473,50 @@ export default function MinutesEditor({
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={item.task}
+                    onChange={(e) => handleActionItemChange(idx, 'task', e.target.value)}
+                    placeholder="업무 내용 (예: 안내문 발송, 예산안 정리 등)"
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm bg-white"
+                  />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">담당자</label>
+                    <input
+                      type="text"
+                      value={item.assignee}
+                      onChange={(e) => handleActionItemChange(idx, 'assignee', e.target.value)}
+                      placeholder="담당자"
+                      className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs sm:text-sm text-center bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">기한</label>
+                    <input
+                      type="text"
+                      value={item.dueDate}
+                      onChange={(e) => handleActionItemChange(idx, 'dueDate', e.target.value)}
+                      placeholder="기한"
+                      className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs sm:text-sm text-center bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-500 mb-1">상태</label>
+                    <select
+                      value={item.status}
+                      onChange={(e) => handleActionItemChange(idx, 'status', e.target.value)}
+                      className="w-full px-2 py-1.5 rounded-lg border border-slate-300 text-xs sm:text-sm bg-white font-medium"
+                    >
+                      <option value="예정">예정</option>
+                      <option value="진행중">진행중</option>
+                      <option value="완료">완료</option>
+                      <option value="보류">보류</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             ))}

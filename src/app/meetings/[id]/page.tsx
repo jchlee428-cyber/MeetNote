@@ -170,19 +170,21 @@ export default function MeetingDetailPage() {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          AI 전문 회의록
+          <span className="hidden sm:inline">AI 전문 회의록</span>
+          <span className="inline sm:hidden">AI 회의록</span>
         </button>
         <button
           onClick={() => {
             setActiveTab('transcript');
           }}
-          className={`pb-3 px-4 font-bold text-sm sm:text-base border-b-2 transition-all ${
+          className={`pb-3 px-3 sm:px-4 font-bold text-xs sm:text-base border-b-2 transition-all whitespace-nowrap ${
             activeTab === 'transcript'
               ? 'border-blue-600 text-blue-600'
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          음성 텍스트 원문 (Transcript)
+          <span className="hidden sm:inline">음성 텍스트 원문 (Transcript)</span>
+          <span className="inline sm:hidden">음성 원문</span>
         </button>
       </div>
 

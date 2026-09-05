@@ -203,10 +203,10 @@ export default function RecordPage() {
   return (
     <div className="space-y-6">
       {/* 상단 네비게이션 헤더 */}
-      <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-200">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition"
+          className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 transition shrink-0"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>메인으로 돌아가기</span>
@@ -219,7 +219,7 @@ export default function RecordPage() {
 
       {/* 상태별 화면 렌더링 */}
       {step === 'idle' && (
-        <div className="py-4">
+        <div className="py-2 sm:py-4">
           <AudioRecorder onRecordingComplete={handleRecordingComplete} />
         </div>
       )}
@@ -244,17 +244,17 @@ export default function RecordPage() {
 
       {/* 완료 상태: 원문 및 AI 회의록 열람/편집 */}
       {step === 'completed' && (
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           {/* 완료 알림 바 */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-emerald-900">
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-emerald-900">
             <div className="flex items-center gap-2.5">
               <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0" />
-              <span className="font-bold text-sm">
+              <span className="font-bold text-xs sm:text-sm break-keep">
                 한국어 음성 전사 및 AI 회의록 작성이 완료되었습니다!
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
               <button
                 onClick={() => setIsEditing(!isEditing)}
                 className="px-3.5 py-1.5 rounded-xl bg-white border border-emerald-300 text-emerald-800 text-xs font-bold hover:bg-emerald-100/50 transition flex items-center gap-1.5"

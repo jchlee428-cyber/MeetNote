@@ -62,33 +62,33 @@ export default function ExportMenu({ minutes, transcript }: ExportMenuProps) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 export-controls no-print">
+    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 export-controls no-print">
       <button
         onClick={handleCopyText}
-        className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition flex items-center gap-1.5"
+        className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 whitespace-nowrap"
         title="회의록 전체 텍스트 복사"
       >
-        {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 text-slate-500" />}
+        {copied ? <Check className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />}
         <span>{copied ? '복사 완료' : '텍스트 복사'}</span>
       </button>
 
       <button
         onClick={handlePrint}
-        className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition flex items-center gap-1.5"
+        className="px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 whitespace-nowrap"
         title="인쇄 또는 PDF로 저장"
       >
-        <Printer className="w-4 h-4 text-slate-500" />
-        <span>인쇄 / PDF 저장</span>
+        <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500" />
+        <span>인쇄 / PDF</span>
       </button>
 
       <button
         onClick={handleDownloadWord}
         disabled={isDownloadingWord}
-        className="px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50"
+        className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 active:scale-95 disabled:opacity-50 whitespace-nowrap"
         title="Word(.docx) 파일로 다운로드"
       >
-        <FileDown className="w-4 h-4 text-blue-600" />
-        <span>{isDownloadingWord ? '생성 중...' : 'Word 다운로드 (.docx)'}</span>
+        <FileDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+        <span>{isDownloadingWord ? '생성 중...' : 'Word 다운로드'}</span>
       </button>
     </div>
   );
