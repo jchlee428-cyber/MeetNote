@@ -25,16 +25,24 @@ export default async function HomePage() {
           음성으로 회의록을 자동으로 만들어보세요.
         </p>
 
-        {/* 60대 이상 시니어 사용자도 한눈에 누를 수 있는 초대형 CTA 버튼 */}
-        <div className="mt-8">
+        {/* 텍스트 없이 마이크만 멋지게 나오는 대형 프리미엄 원형 버튼 */}
+        <div className="mt-10 flex items-center justify-center">
           <Link
             href="/record"
-            className="inline-flex items-center justify-center gap-3 w-full sm:w-auto px-10 py-5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-700 hover:to-indigo-800 text-white font-black text-xl shadow-xl shadow-blue-500/25 hover:shadow-2xl hover:scale-[1.02] active:scale-95 transition-all duration-200"
+            aria-label="회의 녹음 시작"
+            title="회의 녹음 시작"
+            className="group relative inline-flex items-center justify-center"
           >
-            <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-              <Mic className="w-6 h-6 text-white" />
-            </div>
-            <span>🎙 회의 녹음 시작</span>
+            {/* 외곽 펄스 앰비언트 네온 글로우 */}
+            <span className="absolute -inset-3 sm:-inset-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-400 opacity-50 blur-xl sm:blur-2xl group-hover:opacity-90 group-hover:scale-110 transition-all duration-500 animate-pulse"></span>
+
+            {/* 투명 외곽 링 레이어 */}
+            <span className="relative flex items-center justify-center p-3 sm:p-4 rounded-full bg-white/80 backdrop-blur-sm border border-blue-200/80 shadow-xl shadow-blue-500/20 group-hover:border-blue-300 transition-all duration-300">
+              {/* 메인 마이크 오브 버튼 */}
+              <span className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 text-white flex items-center justify-center shadow-2xl shadow-blue-600/50 border-2 border-white/50 group-hover:scale-105 active:scale-95 transition-all duration-300">
+                <Mic className="w-12 h-12 sm:w-14 sm:h-14 text-white drop-shadow-lg group-hover:scale-110 transition-transform duration-300" />
+              </span>
+            </span>
           </Link>
         </div>
 

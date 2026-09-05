@@ -280,18 +280,29 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
               </div>
             )}
 
-            {/* 메인 컨트롤 버튼들 */}
+            {/* 메인 컨트롤 버튼: 텍스트 없이 마이크만 멋지게 나오는 원형 버튼 */}
             {!isRecording ? (
-              <button
-                onClick={startRecording}
-                disabled={disabled}
-                className="w-full sm:w-auto px-8 py-5 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-black text-lg shadow-xl shadow-blue-500/25 hover:shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-3 cursor-pointer"
-              >
-                <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center">
-                  <Mic className="w-5 h-5 text-white" />
-                </div>
-                <span>🎙 회의 녹음 시작</span>
-              </button>
+              <div className="flex flex-col items-center justify-center my-4">
+                <button
+                  type="button"
+                  onClick={startRecording}
+                  disabled={disabled}
+                  aria-label="회의 녹음 시작"
+                  title="회의 녹음 시작"
+                  className="group relative inline-flex items-center justify-center cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {/* 외곽 펄스 앰비언트 네온 글로우 */}
+                  <span className="absolute -inset-3 sm:-inset-4 rounded-full bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-400 opacity-50 blur-xl sm:blur-2xl group-hover:opacity-90 group-hover:scale-110 transition-all duration-500 animate-pulse"></span>
+
+                  {/* 투명 외곽 링 레이어 */}
+                  <span className="relative flex items-center justify-center p-3 sm:p-4 rounded-full bg-white/80 backdrop-blur-sm border border-blue-200/80 shadow-xl shadow-blue-500/20 group-hover:border-blue-300 transition-all duration-300">
+                    {/* 메인 마이크 오브 버튼 */}
+                    <span className="w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-tr from-blue-600 via-indigo-600 to-sky-500 text-white flex items-center justify-center shadow-2xl shadow-blue-600/50 border-2 border-white/50 group-hover:scale-105 active:scale-95 transition-all duration-300">
+                      <Mic className="w-12 h-12 sm:w-14 sm:h-14 text-white drop-shadow-lg group-hover:scale-110 transition-transform duration-300" />
+                    </span>
+                  </span>
+                </button>
+              </div>
             ) : (
               <div className="flex items-center gap-4 w-full justify-center">
                 {/* 일시정지 / 다시 시작 */}
