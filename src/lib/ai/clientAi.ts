@@ -2,7 +2,7 @@
 // Vercel 서버리스의 4.5MB 페이로드 제한 및 10초 타임아웃을 우회하여 대용량 음성도 안전하게 전사
 import { MeetingMinutes, MeetingBasicInfo } from '@/types/meeting';
 import { MEETING_MINUTES_SYSTEM_PROMPT, buildUserPrompt } from './prompt';
-import { normalizeAudioMimeType } from './transcribe';
+import { normalizeAudioMimeType, getSafeAudioExtension } from './transcribe';
 
 interface ClientTranscribeResult {
   transcript: string;
@@ -67,57 +67,19 @@ function normalizeMinutes(parsed: any, basicInfo?: Partial<MeetingBasicInfo>): M
 export async function transcribeAudioClient(
   file: File,
   meta: { title: string; location: string; participants: string },
-  keys: { openaiKey?: string; geminiKey?: string }
+  keys: { openaiKey?: string; geminiKey?: string; preferredEngine?: 'auto' | 'openai' | 'gemini' }
 ): Promise<ClientTranscribeResult> {
   const openaiKey = keys.openaiKey?.trim();
   const geminiKey = keys.geminiKey?.trim();
+  const preferredEngine = keys.preferredEngine || 'auto';
 
-  // (1) OpenAI Whisper 클라이언트 직접 호출
-  if (openaiKey) {
-    try {
-      const normalizedMime = normalizeAudioMimeType(file.type, file.name);
-      let ext = normalizedMime.split('/')[1] || 'mp4';
-      if (ext === 'mpeg') ext = 'mp3';
-      const cleanName = file.name.includes('.') ? file.name : `recording_${Date.now()}.${ext}`;
-
-      const formData = new FormData();
-      formData.append('file', file, cleanName);
-      formData.append('model', 'whisper-1');
-      formData.append('language', 'ko');
-      formData.append('response_format', 'verbose_json');
-
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          transcript: data.text || '',
-          provider: 'openai-whisper-direct',
-        };
-      } else {
-        const errText = await response.text();
-        console.warn('Direct OpenAI Whisper failed:', response.status, errText);
-        if (!geminiKey) {
-          let msg = `OpenAI Whisper 전사 실패 (${response.status})`;
-          if (response.status === 401) msg = 'OpenAI API Key가 올바르지 않습니다. [API 설정]을 확인해주세요.';
-          if (response.status === 429) msg = 'OpenAI API 크레딧 또는 사용량 한도를 초과했습니다.';
-          throw new Error(msg);
-        }
-      }
-    } catch (err: any) {
-      if (!geminiKey) throw err;
-      console.warn('Direct Whisper failed, falling back to Gemini:', err);
-    }
+  if (!file || file.size === 0) {
+    throw new Error('녹음 파일이 비어있습니다 (0바이트). 다시 녹음하거나 파일을 선택해주세요.');
   }
 
-  // (2) Google Gemini 클라이언트 직접 호출
-  if (geminiKey) {
+  // Gemini 직접 호출 내부 함수
+  const callGeminiStt = async (): Promise<ClientTranscribeResult> => {
+    if (!geminiKey) throw new Error('Gemini API Key가 설정되지 않았습니다.');
     const base64Audio = await fileToBase64(file);
     const normalizedMime = normalizeAudioMimeType(file.type, file.name);
     const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
@@ -162,13 +124,20 @@ export async function transcribeAudioClient(
         } else {
           const errText = await response.text();
           console.error(`Direct Gemini (${model}) error:`, response.status, errText);
-          if (response.status === 400 && errText.includes('API_KEY_INVALID')) {
+          let parsedDetail = '';
+          try {
+            const p = JSON.parse(errText);
+            parsedDetail = p.error?.message || '';
+          } catch {
+            parsedDetail = errText;
+          }
+          if (response.status === 400 && (errText.includes('API_KEY_INVALID') || parsedDetail.includes('API key not valid'))) {
             throw new Error('Gemini API Key가 올바르지 않습니다. 상단 [API 설정]에서 키를 다시 확인해주세요.');
           }
           if (response.status === 429) {
             throw new Error('Gemini API 호출 한도를 초과했습니다 (429 Quota Exceeded). 잠시 후 다시 시도해주세요.');
           }
-          lastError = `${response.status}: ${errText}`;
+          lastError = `${response.status}: ${parsedDetail || errText}`;
         }
       } catch (err: any) {
         if (err.message.includes('API Key') || err.message.includes('한도')) {
@@ -179,6 +148,105 @@ export async function transcribeAudioClient(
     }
 
     throw new Error(`Gemini 음성 전사 실패: ${lastError}`);
+  };
+
+  // OpenAI Whisper 직접 호출 내부 함수
+  const callWhisperStt = async (): Promise<ClientTranscribeResult> => {
+    if (!openaiKey) throw new Error('OpenAI API Key가 설정되지 않았습니다.');
+
+    // 25MB 파일 용량 제한 체크
+    const MAX_WHISPER_SIZE = 25 * 1024 * 1024;
+    if (file.size > MAX_WHISPER_SIZE) {
+      if (geminiKey) {
+        console.info('File > 25MB, switching to Gemini...');
+        return await callGeminiStt();
+      }
+      throw new Error(
+        `오디오 파일 용량(${(file.size / (1024 * 1024)).toFixed(1)}MB)이 OpenAI Whisper 한도(25MB)를 초과합니다. 파일을 분할하시거나 상단 [API 설정]에 Google Gemini API 키를 등록해주세요.`
+      );
+    }
+
+    const safeExt = getSafeAudioExtension(file.name, file.type);
+    const safeFileName = `audio_${Date.now()}.${safeExt}`;
+    // 특수문자나 한글 파일명으로 인한 OpenAI HTTP 400 오류를 방지하기 위해 ASCII 안전 파일 객체 생성
+    const audioBlob = file.slice(0, file.size, file.type || `audio/${safeExt}`);
+    const safeFile = new File([audioBlob], safeFileName, { type: file.type || `audio/${safeExt}` });
+
+    const formData = new FormData();
+    formData.append('file', safeFile, safeFileName);
+    formData.append('model', 'whisper-1');
+    formData.append('language', 'ko');
+    formData.append('response_format', 'verbose_json');
+
+    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: formData,
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      return {
+        transcript: data.text || '',
+        provider: 'openai-whisper-direct',
+      };
+    } else {
+      const errText = await response.text();
+      console.warn('Direct OpenAI Whisper failed:', response.status, errText);
+
+      let detailMsg = '';
+      try {
+        const parsed = JSON.parse(errText);
+        detailMsg = parsed.error?.message || '';
+      } catch {
+        detailMsg = errText;
+      }
+
+      // Gemini 키가 있으면 자동 대체 실행
+      if (geminiKey && preferredEngine !== 'openai') {
+        console.info('Whisper failed, attempting Gemini fallback...', detailMsg);
+        return await callGeminiStt();
+      }
+
+      let msg = `OpenAI Whisper 전사 실패 (${response.status}): ${detailMsg || '오디오 처리 실패'}`;
+      if (response.status === 401) {
+        msg = 'OpenAI API Key가 올바르지 않습니다. 상단 [API 설정]에서 키를 다시 확인해주세요.';
+      } else if (response.status === 429) {
+        msg = 'OpenAI API 사용량 한도를 초과했습니다 (429 Quota). OpenAI 잔액을 충전하시거나, 상단 [API 설정]에 무료 Google Gemini API 키를 등록해주세요.';
+      }
+      throw new Error(msg);
+    }
+  };
+
+  // 엔진 우선순위에 따른 분기 처리
+  if (preferredEngine === 'gemini' && geminiKey) {
+    try {
+      return await callGeminiStt();
+    } catch (err: any) {
+      if (openaiKey) {
+        console.warn('Gemini failed, trying OpenAI Whisper fallback:', err);
+        return await callWhisperStt();
+      }
+      throw err;
+    }
+  }
+
+  if (openaiKey) {
+    try {
+      return await callWhisperStt();
+    } catch (err: any) {
+      if (geminiKey && preferredEngine !== 'openai') {
+        console.warn('Whisper failed, trying Gemini fallback:', err);
+        return await callGeminiStt();
+      }
+      throw err;
+    }
+  }
+
+  if (geminiKey) {
+    return await callGeminiStt();
   }
 
   // (3) 키가 없으면 서버 라우트(/api/transcribe)로 요청
@@ -221,10 +289,11 @@ export async function transcribeAudioClient(
 export async function generateMinutesClient(
   transcript: string,
   basicInfo: Partial<MeetingBasicInfo>,
-  keys: { openaiKey?: string; geminiKey?: string }
+  keys: { openaiKey?: string; geminiKey?: string; preferredEngine?: 'auto' | 'openai' | 'gemini' }
 ): Promise<{ minutes: MeetingMinutes; provider: string }> {
   const openaiKey = keys.openaiKey?.trim();
   const geminiKey = keys.geminiKey?.trim();
+  const preferredEngine = keys.preferredEngine || 'auto';
 
   const userPrompt = buildUserPrompt(transcript, {
     title: basicInfo?.title,
@@ -232,45 +301,8 @@ export async function generateMinutesClient(
     attendees: basicInfo?.attendees,
   });
 
-  // (1) OpenAI GPT-4o 직접 호출
-  if (openaiKey) {
-    try {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${openaiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o',
-          messages: [
-            { role: 'system', content: MEETING_MINUTES_SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          temperature: 0.2,
-          response_format: { type: 'json_object' },
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (content) {
-          const parsed = JSON.parse(cleanJsonResponse(content));
-          return {
-            minutes: normalizeMinutes(parsed, basicInfo),
-            provider: 'openai-gpt-4o-direct',
-          };
-        }
-      }
-    } catch (err) {
-      if (!geminiKey) throw err;
-      console.warn('Direct OpenAI generate minutes failed, trying Gemini:', err);
-    }
-  }
-
-  // (2) Google Gemini 직접 호출
-  if (geminiKey) {
+  const callGeminiMinutes = async (): Promise<{ minutes: MeetingMinutes; provider: string }> => {
+    if (!geminiKey) throw new Error('Gemini API Key가 설정되지 않았습니다.');
     const models = ['gemini-2.0-flash', 'gemini-1.5-flash'];
     let lastError = '';
 
@@ -310,14 +342,115 @@ export async function generateMinutesClient(
           }
         } else {
           const errText = await response.text();
-          lastError = `${response.status}: ${errText}`;
+          let detail = '';
+          try {
+            const p = JSON.parse(errText);
+            detail = p.error?.message || '';
+          } catch {
+            detail = errText;
+          }
+          if (response.status === 400 && (errText.includes('API_KEY_INVALID') || detail.includes('API key not valid'))) {
+            throw new Error('Gemini API Key가 올바르지 않습니다. 상단 [API 설정]에서 키를 다시 확인해주세요.');
+          }
+          if (response.status === 429) {
+            throw new Error('Gemini API 호출 한도를 초과했습니다 (429 Quota Exceeded). 잠시 후 다시 시도해주세요.');
+          }
+          lastError = `${response.status}: ${detail || errText}`;
         }
       } catch (err: any) {
+        if (err.message.includes('API Key') || err.message.includes('한도')) {
+          throw err;
+        }
         lastError = err.message;
       }
     }
 
     throw new Error(`Gemini 회의록 생성 실패: ${lastError}`);
+  };
+
+  const callOpenAIMinutes = async (): Promise<{ minutes: MeetingMinutes; provider: string }> => {
+    if (!openaiKey) throw new Error('OpenAI API Key가 설정되지 않았습니다.');
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [
+          { role: 'system', content: MEETING_MINUTES_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.2,
+        response_format: { type: 'json_object' },
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        const parsed = JSON.parse(cleanJsonResponse(content));
+        return {
+          minutes: normalizeMinutes(parsed, basicInfo),
+          provider: 'openai-gpt-4o-direct',
+        };
+      }
+      throw new Error('OpenAI 응답 데이터가 올바르지 않습니다.');
+    } else {
+      const errText = await response.text();
+      let detailMsg = '';
+      try {
+        const parsed = JSON.parse(errText);
+        detailMsg = parsed.error?.message || '';
+      } catch {
+        detailMsg = errText;
+      }
+
+      if (geminiKey && preferredEngine !== 'openai') {
+        console.info('GPT-4o failed, attempting Gemini fallback...', detailMsg);
+        return await callGeminiMinutes();
+      }
+
+      let msg = `OpenAI 회의록 생성 실패 (${response.status}): ${detailMsg || '생성 실패'}`;
+      if (response.status === 401) {
+        msg = 'OpenAI API Key가 올바르지 않습니다. 상단 [API 설정]에서 키를 다시 확인해주세요.';
+      } else if (response.status === 429) {
+        msg = 'OpenAI API 사용량 한도를 초과했습니다 (429 Quota). 크레딧을 충전하시거나, 무료 Google Gemini API 키를 [API 설정]에 등록해주세요.';
+      }
+      throw new Error(msg);
+    }
+  };
+
+  // 엔진 우선순위에 따른 분기 처리
+  if (preferredEngine === 'gemini' && geminiKey) {
+    try {
+      return await callGeminiMinutes();
+    } catch (err: any) {
+      if (openaiKey) {
+        console.warn('Gemini failed, trying OpenAI GPT-4o fallback:', err);
+        return await callOpenAIMinutes();
+      }
+      throw err;
+    }
+  }
+
+  if (openaiKey) {
+    try {
+      return await callOpenAIMinutes();
+    } catch (err: any) {
+      if (geminiKey && preferredEngine !== 'openai') {
+        console.warn('OpenAI failed, trying Gemini fallback:', err);
+        return await callGeminiMinutes();
+      }
+      throw err;
+    }
+  }
+
+  if (geminiKey) {
+    return await callGeminiMinutes();
   }
 
   // (3) 키가 없으면 서버 라우트(/api/generate-minutes)로 요청

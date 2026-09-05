@@ -59,8 +59,9 @@ export default function RecordPage() {
       setStep('transcribing');
       const openaiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_openai_key') || undefined : undefined;
       const geminiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_gemini_key') || undefined : undefined;
+      const preferredEngine = typeof window !== 'undefined' ? (localStorage.getItem('meetnote_preferred_engine') as any) || 'auto' : 'auto';
 
-      const result = await transcribeAudioClient(file, meta, { openaiKey, geminiKey });
+      const result = await transcribeAudioClient(file, meta, { openaiKey, geminiKey, preferredEngine });
       const transcribedText = result.transcript || '';
       setTranscript(transcribedText);
 
@@ -86,6 +87,7 @@ export default function RecordPage() {
       const targetMeta = meta || basicMeta;
       const openaiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_openai_key') || undefined : undefined;
       const geminiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_gemini_key') || undefined : undefined;
+      const preferredEngine = typeof window !== 'undefined' ? (localStorage.getItem('meetnote_preferred_engine') as any) || 'auto' : 'auto';
 
       const result = await generateMinutesClient(
         sourceText,
@@ -94,7 +96,7 @@ export default function RecordPage() {
           location: targetMeta.location,
           attendees: targetMeta.participants,
         },
-        { openaiKey, geminiKey }
+        { openaiKey, geminiKey, preferredEngine }
       );
 
       setMinutes(result.minutes);

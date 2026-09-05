@@ -44,6 +44,22 @@ export function normalizeAudioMimeType(mimeType: string, fileName?: string): str
   return 'audio/mp4';
 }
 
+export function getSafeAudioExtension(fileName?: string, mimeType?: string): string {
+  const ext = (fileName || '').split('.').pop()?.toLowerCase() || '';
+  const validExts = ['m4a', 'mp3', 'mp4', 'wav', 'webm', 'ogg', 'flac', 'aac', 'mpeg'];
+  if (validExts.includes(ext)) {
+    return ext === 'aac' ? 'm4a' : ext;
+  }
+  const lowerMime = (mimeType || '').toLowerCase();
+  if (lowerMime.includes('m4a') || lowerMime.includes('mp4') || lowerMime.includes('aac')) return 'm4a';
+  if (lowerMime.includes('mp3') || lowerMime.includes('mpeg')) return 'mp3';
+  if (lowerMime.includes('wav')) return 'wav';
+  if (lowerMime.includes('ogg')) return 'ogg';
+  if (lowerMime.includes('flac')) return 'flac';
+  if (lowerMime.includes('webm')) return 'webm';
+  return 'm4a';
+}
+
 export async function transcribeAudio(options: TranscribeOptions): Promise<TranscribeResponse> {
   const openaiKey = options.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
   const geminiKey = options.geminiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
@@ -56,11 +72,8 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
   }
 
   const normalizedMime = normalizeAudioMimeType(options.mimeType, options.fileName);
-  let ext = normalizedMime.split('/')[1] || 'mp4';
-  if (ext === 'mpeg') ext = 'mp3';
-  const cleanFileName = options.fileName?.includes('.')
-    ? options.fileName
-    : `meeting_${Date.now()}.${ext}`;
+  const safeExt = getSafeAudioExtension(options.fileName, options.mimeType);
+  const safeFileName = `meeting_${Date.now()}.${safeExt}`;
 
   // 2. OpenAI Whisper API 시도 (OpenAI 키가 있을 때)
   if (openaiKey && openaiKey !== 'your_openai_api_key_here') {
@@ -68,7 +81,7 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
       const formData = new FormData();
       const uint8Array = new Uint8Array(options.audioBuffer);
       const audioBlob = new Blob([uint8Array], { type: normalizedMime });
-      formData.append('file', audioBlob, cleanFileName);
+      formData.append('file', audioBlob, safeFileName);
       formData.append('model', 'whisper-1');
       formData.append('language', 'ko');
       formData.append('response_format', 'verbose_json');
@@ -84,18 +97,28 @@ export async function transcribeAudio(options: TranscribeOptions): Promise<Trans
       if (!response.ok) {
         const errText = await response.text();
         console.error('OpenAI Whisper API error:', response.status, errText);
-        let msg = `OpenAI Whisper 전사 실패 (${response.status}): ${errText}`;
-        if (response.status === 401) msg = 'OpenAI API Key가 올바르지 않습니다. [API 설정]을 확인해주세요.';
-        if (response.status === 429) msg = 'OpenAI API 크레딧 또는 사용량 한도를 초과했습니다.';
-        throw new Error(msg);
-      }
+        let detailMsg = '';
+        try {
+          const parsed = JSON.parse(errText);
+          detailMsg = parsed.error?.message || '';
+        } catch {
+          detailMsg = errText;
+        }
 
-      const result = await response.json();
-      return {
-        transcript: result.text || '',
-        duration: result.duration ? Math.round(result.duration) : undefined,
-        provider: 'openai-whisper',
-      };
+        if (!geminiKey) {
+          let msg = `OpenAI Whisper 전사 실패 (${response.status}): ${detailMsg || '오디오 처리 실패'}`;
+          if (response.status === 401) msg = 'OpenAI API Key가 올바르지 않습니다. [API 설정]을 확인해주세요.';
+          if (response.status === 429) msg = 'OpenAI API 크레딧 또는 사용량 한도를 초과했습니다.';
+          throw new Error(msg);
+        }
+      } else {
+        const result = await response.json();
+        return {
+          transcript: result.text || '',
+          duration: result.duration ? Math.round(result.duration) : undefined,
+          provider: 'openai-whisper',
+        };
+      }
     } catch (err: any) {
       if (!geminiKey) throw err;
       console.warn('Whisper API failed, trying Gemini audio fallback:', err.message);
