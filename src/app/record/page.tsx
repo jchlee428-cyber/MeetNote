@@ -36,6 +36,11 @@ export default function RecordPage() {
   const [savedMeetingId, setSavedMeetingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingMinutes, setIsGeneratingMinutes] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 1. 녹음 완료 후 음성 전사 시작 핸들러
   const handleRecordingComplete = async (
@@ -185,6 +190,15 @@ export default function RecordPage() {
       setIsSaving(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center gap-3">
+        <div className="w-9 h-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm text-slate-500 font-medium">회의 녹음 환경을 준비하고 있습니다...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

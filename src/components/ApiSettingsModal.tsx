@@ -13,6 +13,7 @@ export default function ApiSettingsModal({ isOpen, onClose }: ApiSettingsModalPr
   const [geminiKey, setGeminiKey] = useState('');
   const [preferredEngine, setPreferredEngine] = useState<'auto' | 'openai' | 'gemini'>('auto');
   const [saved, setSaved] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -20,6 +21,7 @@ export default function ApiSettingsModal({ isOpen, onClose }: ApiSettingsModalPr
       setGeminiKey(localStorage.getItem('meetnote_gemini_key') || '');
       setPreferredEngine((localStorage.getItem('meetnote_preferred_engine') as any) || 'auto');
     }
+    setConfirmClear(false);
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -46,8 +48,6 @@ export default function ApiSettingsModal({ isOpen, onClose }: ApiSettingsModalPr
       onClose();
     }, 1000);
   };
-
-  const [confirmClear, setConfirmClear] = useState(false);
 
   const handleClear = () => {
     if (typeof window !== 'undefined') {
