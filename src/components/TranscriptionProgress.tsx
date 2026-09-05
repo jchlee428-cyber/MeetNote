@@ -8,12 +8,13 @@ interface TranscriptionProgressProps {
   step: ProcessingStep;
   errorMessage?: string;
   onRetry?: () => void;
+  onOpenSettings?: () => void;
 }
 
 const STEPS = [
   { id: 'uploading', label: '녹음 파일 업로드', desc: '음성 데이터를 서버로 안전하게 전송 중', icon: UploadCloud },
   { id: 'analyzing', label: '음성 분석', desc: '음성 구간 및 주파수 분석', icon: Activity },
-  { id: 'transcribing', label: '한국어 텍스트 변환', desc: 'Whisper 인공지능 한국어 받아쓰기', icon: Languages },
+  { id: 'transcribing', label: '한국어 텍스트 변환', desc: 'Whisper / Gemini AI 한국어 받아쓰기', icon: Languages },
   { id: 'generating', label: 'AI 회의록 작성', desc: '8단계 구조 회의록 및 안건/결정사항 도출', icon: FileText },
   { id: 'completed', label: '완료', desc: '회의록 작성 완료!', icon: CheckCircle2 },
 ];
@@ -22,6 +23,7 @@ export default function TranscriptionProgress({
   step,
   errorMessage,
   onRetry,
+  onOpenSettings,
 }: TranscriptionProgressProps) {
   const getStepIndex = (s: ProcessingStep) => {
     switch (s) {
@@ -60,14 +62,24 @@ export default function TranscriptionProgress({
         <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm">
           <p className="font-semibold mb-1">오류가 발생했습니다</p>
           <p>{errorMessage}</p>
-          {onRetry && (
-            <button
-              onClick={onRetry}
-              className="mt-3 px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg text-xs transition"
-            >
-              다시 시도하기
-            </button>
-          )}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
+            {onOpenSettings && (
+              <button
+                onClick={onOpenSettings}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-xs transition"
+              >
+                🔑 API 설정 열기
+              </button>
+            )}
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                className="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white font-medium rounded-lg text-xs transition"
+              >
+                다시 시도하기
+              </button>
+            )}
+          </div>
         </div>
       )}
 

@@ -8,8 +8,9 @@ import TranscriptViewer from '@/components/TranscriptViewer';
 import MinutesViewer from '@/components/MinutesViewer';
 import MinutesEditor from '@/components/MinutesEditor';
 import ExportMenu from '@/components/ExportMenu';
+import ApiSettingsModal from '@/components/ApiSettingsModal';
 import { ProcessingStep, MeetingMinutes, MeetingRecord } from '@/types/meeting';
-import { ArrowLeft, Save, Edit3, CheckCircle, Eye } from 'lucide-react';
+import { ArrowLeft, Save, Edit3, CheckCircle, Eye, Key } from 'lucide-react';
 import Link from 'next/link';
 
 export default function RecordPage() {
@@ -17,6 +18,8 @@ export default function RecordPage() {
 
   const [step, setStep] = useState<ProcessingStep>('idle');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [lastAudioFile, setLastAudioFile] = useState<File | null>(null);
 
   // 저장될 회의 데이터 상태
   const [transcript, setTranscript] = useState<string>('');
@@ -37,6 +40,7 @@ export default function RecordPage() {
     file: File,
     meta: { title: string; location: string; participants: string }
   ) => {
+    setLastAudioFile(file);
     setBasicMeta(meta);
     setErrorMessage(null);
 
@@ -241,8 +245,11 @@ export default function RecordPage() {
         <TranscriptionProgress
           step={step}
           errorMessage={errorMessage || undefined}
+          onOpenSettings={() => setIsSettingsOpen(true)}
           onRetry={() => {
-            if (transcript) {
+            if (lastAudioFile) {
+              handleRecordingComplete(lastAudioFile, basicMeta);
+            } else if (transcript) {
               triggerGenerateMinutes(transcript);
             } else {
               setStep('idle');
@@ -299,6 +306,8 @@ export default function RecordPage() {
           />
         </div>
       )}
+
+      <ApiSettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }
