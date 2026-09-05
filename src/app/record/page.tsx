@@ -13,6 +13,8 @@ import { ProcessingStep, MeetingMinutes, MeetingRecord } from '@/types/meeting';
 import { ArrowLeft, Save, Edit3, CheckCircle, Eye, Key } from 'lucide-react';
 import Link from 'next/link';
 
+import { transcribeAudioClient, generateMinutesClient } from '@/lib/ai/clientAi';
+
 export default function RecordPage() {
   const router = useRouter();
 
@@ -45,41 +47,21 @@ export default function RecordPage() {
     setErrorMessage(null);
 
     try {
-      // 1단계: 업로드 진행
+      // 1단계: 업로드 / 준비 진행
       setStep('uploading');
-      await new Promise((r) => setTimeout(r, 600));
+      await new Promise((r) => setTimeout(r, 400));
 
       // 2단계: 분석 진행
       setStep('analyzing');
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('title', meta.title);
-      formData.append('location', meta.location);
-      formData.append('participants', meta.participants);
+      await new Promise((r) => setTimeout(r, 400));
 
-      // 3단계: 한국어 전사 API 호출
+      // 3단계: 한국어 전사 호출
       setStep('transcribing');
-      const transcribeHeaders: Record<string, string> = {};
-      if (typeof window !== 'undefined') {
-        const oKey = localStorage.getItem('meetnote_openai_key');
-        const gKey = localStorage.getItem('meetnote_gemini_key');
-        if (oKey) transcribeHeaders['x-openai-key'] = oKey;
-        if (gKey) transcribeHeaders['x-gemini-key'] = gKey;
-      }
+      const openaiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_openai_key') || undefined : undefined;
+      const geminiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_gemini_key') || undefined : undefined;
 
-      const res = await fetch('/api/transcribe', {
-        method: 'POST',
-        headers: transcribeHeaders,
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || '음성 전사에 실패했습니다.');
-      }
-
-      const data = await res.json();
-      const transcribedText = data.transcript || '';
+      const result = await transcribeAudioClient(file, meta, { openaiKey, geminiKey });
+      const transcribedText = result.transcript || '';
       setTranscript(transcribedText);
 
       // 전사 완료 후 4단계: 자동으로 AI 회의록 생성 호출
@@ -102,46 +84,32 @@ export default function RecordPage() {
       setErrorMessage(null);
 
       const targetMeta = meta || basicMeta;
-      const minutesHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
-      if (typeof window !== 'undefined') {
-        const oKey = localStorage.getItem('meetnote_openai_key');
-        const gKey = localStorage.getItem('meetnote_gemini_key');
-        if (oKey) minutesHeaders['x-openai-key'] = oKey;
-        if (gKey) minutesHeaders['x-gemini-key'] = gKey;
-      }
+      const openaiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_openai_key') || undefined : undefined;
+      const geminiKey = typeof window !== 'undefined' ? localStorage.getItem('meetnote_gemini_key') || undefined : undefined;
 
-      const res = await fetch('/api/generate-minutes', {
-        method: 'POST',
-        headers: minutesHeaders,
-        body: JSON.stringify({
-          transcript: sourceText,
-          basicInfo: {
-            title: targetMeta.title,
-            location: targetMeta.location,
-            attendees: targetMeta.participants,
-          },
-        }),
-      });
+      const result = await generateMinutesClient(
+        sourceText,
+        {
+          title: targetMeta.title,
+          location: targetMeta.location,
+          attendees: targetMeta.participants,
+        },
+        { openaiKey, geminiKey }
+      );
 
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'AI 회의록 생성에 실패했습니다.');
-      }
-
-      const data = await res.json();
-      setMinutes(data.minutes);
+      setMinutes(result.minutes);
 
       // 자동 저장 (서버 DB에 회의 레코드 생성)
       const saveRes = await fetch('/api/meetings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: targetMeta.title || data.minutes.basicInfo?.title || '정기 회의록',
+          title: targetMeta.title || result.minutes.basicInfo?.title || '정기 회의록',
           meeting_date: new Date().toISOString(),
-          location: targetMeta.location || data.minutes.basicInfo?.location || '',
-          participants: targetMeta.participants || data.minutes.basicInfo?.attendees || '',
+          location: targetMeta.location || result.minutes.basicInfo?.location || '',
+          participants: targetMeta.participants || result.minutes.basicInfo?.attendees || '',
           transcript: sourceText,
-          minutes: data.minutes,
+          minutes: result.minutes,
         }),
       });
 
