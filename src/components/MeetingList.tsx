@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MeetingRecord } from '@/types/meeting';
 import { Search, Calendar, MapPin, Users, ChevronRight, Trash2, FileText, Sparkles } from 'lucide-react';
+import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 
 interface MeetingListProps {
   initialMeetings?: MeetingRecord[];
@@ -13,7 +14,8 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
   const [meetings, setMeetings] = useState<MeetingRecord[]>(initialMeetings);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchMeetings = async (q: string) => {
     try {
@@ -25,13 +27,26 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
         list = data.meetings || [];
       }
 
-      // 클라이언트 로컬 저장소와 병합하여 서버리스 재시작 시에도 회의록 보존
+      // 삭제된 tombstone ID 확인
+      let deletedSet = new Set<string>();
+      if (typeof window !== 'undefined') {
+        try {
+          const deleted: string[] = JSON.parse(localStorage.getItem('meetnote_deleted_ids') || '[]');
+          deletedSet = new Set(deleted);
+        } catch (e) {}
+      }
+
+      // 서버 목록에서 삭제된 ID는 즉시 제외
+      list = list.filter((m) => !deletedSet.has(m.id));
+
+      // 클라이언트 로컬 저장소와 병합하되, 삭제된 ID는 캐시에서도 필터링
       if (typeof window !== 'undefined') {
         try {
           const cached: MeetingRecord[] = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
+          const validCached = cached.filter((m) => !deletedSet.has(m.id));
           const map = new Map<string, MeetingRecord>();
           list.forEach((m) => map.set(m.id, m));
-          cached.forEach((m) => {
+          validCached.forEach((m) => {
             if (!map.has(m.id)) {
               map.set(m.id, m);
             }
@@ -72,27 +87,44 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery]);
 
-  const handleDelete = async (id: string, e: React.MouseEvent) => {
+  const handleClickDelete = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setDeleteTargetId(id);
+  };
 
-    if (!confirm('정말로 이 회의록을 삭제하시겠습니까?\n삭제된 내용은 복구할 수 없습니다.')) {
-      return;
-    }
-
+  const handleConfirmDelete = async () => {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
     try {
-      await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
-      setMeetings((prev) => prev.filter((m) => m.id !== id));
+      setIsDeleting(true);
+
+      // 1. deleted tombstone에 등록
       if (typeof window !== 'undefined') {
         try {
+          const deleted: string[] = JSON.parse(localStorage.getItem('meetnote_deleted_ids') || '[]');
+          if (!deleted.includes(id)) {
+            deleted.push(id);
+            localStorage.setItem('meetnote_deleted_ids', JSON.stringify(deleted));
+          }
           const cached: MeetingRecord[] = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
           const filtered = cached.filter((m) => m.id !== id);
           localStorage.setItem('meetnote_cached_meetings', JSON.stringify(filtered));
-        } catch (cErr) {}
+        } catch (storageErr) {
+          console.warn('Storage delete error:', storageErr);
+        }
       }
+
+      // 2. 로컬 state 즉시 반영
+      setMeetings((prev) => prev.filter((m) => m.id !== id));
+
+      // 3. 서버에 비동기 DELETE 전송
+      await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
     } catch (err) {
       console.error('회의 삭제 에러:', err);
-      alert('오류가 발생했습니다.');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTargetId(null);
     }
   };
 
@@ -202,7 +234,8 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
 
                   <div className="flex items-center gap-2 shrink-0 self-center">
                     <button
-                      onClick={(e) => handleDelete(meeting.id, e)}
+                      type="button"
+                      onClick={(e) => handleClickDelete(meeting.id, e)}
                       className="p-2 text-slate-300 hover:text-red-600 rounded-lg hover:bg-red-50 transition"
                       title="회의 삭제"
                     >
@@ -218,6 +251,16 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
           })}
         </div>
       )}
+
+      {/* 회의록 삭제 확인 모달 */}
+      <DeleteConfirmModal
+        isOpen={Boolean(deleteTargetId)}
+        title="회의록 영구 삭제"
+        description="정말로 이 회의록을 삭제하시겠습니까? 전사 내용과 작성된 회의록이 영구 삭제되며 복구할 수 없습니다."
+        isDeleting={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setDeleteTargetId(null)}
+      />
     </div>
   );
 }

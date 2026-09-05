@@ -126,6 +126,29 @@ export default function MinutesEditor({
     }));
   };
 
+  // 찬반 또는 주요 의견 수정/추가/삭제
+  const handleOpinionChange = (idx: number, val: string) => {
+    setMinutes((prev) => {
+      const next = [...(prev.opinions || [])];
+      next[idx] = val;
+      return { ...prev, opinions: next };
+    });
+  };
+
+  const handleAddOpinion = () => {
+    setMinutes((prev) => ({
+      ...prev,
+      opinions: [...(prev.opinions || []), '주요 의견 또는 이견'],
+    }));
+  };
+
+  const handleRemoveOpinion = (idx: number) => {
+    setMinutes((prev) => ({
+      ...prev,
+      opinions: (prev.opinions || []).filter((_, i) => i !== idx),
+    }));
+  };
+
   // 실행사항(Action Items) 수정/추가/삭제
   const handleActionItemChange = (idx: number, field: keyof ActionItem, val: string) => {
     setMinutes((prev) => {
@@ -261,8 +284,9 @@ export default function MinutesEditor({
                   className="flex-1 px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-500 text-sm"
                 />
                 <button
+                  type="button"
                   onClick={() => handleRemoveAgenda(idx)}
-                  className="p-2 text-slate-400 hover:text-red-500 transition"
+                  className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
                   title="삭제"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -277,6 +301,7 @@ export default function MinutesEditor({
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-bold text-slate-900">3. 주요 논의 내용</h3>
             <button
+              type="button"
               onClick={handleAddDiscussion}
               className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
             >
@@ -302,8 +327,10 @@ export default function MinutesEditor({
                     placeholder="안건 제목"
                   />
                   <button
+                    type="button"
                     onClick={() => handleRemoveDiscussion(idx)}
-                    className="text-slate-400 hover:text-red-500 p-1"
+                    className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-red-50 transition"
+                    title="삭제"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
@@ -325,6 +352,7 @@ export default function MinutesEditor({
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-bold text-emerald-800">4. 결정사항 (의결/가결)</h3>
             <button
+              type="button"
               onClick={handleAddDecision}
               className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 flex items-center gap-1"
             >
@@ -340,7 +368,12 @@ export default function MinutesEditor({
                   onChange={(e) => handleDecisionChange(idx, e.target.value)}
                   className="flex-1 px-3 py-2 rounded-lg border-2 border-emerald-200 focus:ring-2 focus:ring-emerald-400 text-sm"
                 />
-                <button onClick={() => handleRemoveDecision(idx)} className="p-2 text-slate-400 hover:text-red-500">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveDecision(idx)}
+                  className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
+                  title="삭제"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -368,7 +401,47 @@ export default function MinutesEditor({
                   onChange={(e) => handleUnresolvedChange(idx, e.target.value)}
                   className="flex-1 px-3 py-2 rounded-lg border border-amber-200 focus:ring-2 focus:ring-amber-400 text-sm"
                 />
-                <button onClick={() => handleRemoveUnresolved(idx)} className="p-2 text-slate-400 hover:text-red-500">
+                <button
+                  type="button"
+                  onClick={() => handleRemoveUnresolved(idx)}
+                  className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
+                  title="삭제"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ⑥ 찬반 또는 주요 의견 */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-bold text-slate-900">6. 찬반 또는 주요 의견</h3>
+            <button
+              type="button"
+              onClick={handleAddOpinion}
+              className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+            >
+              <Plus className="w-3.5 h-3.5" /> 의견 추가
+            </button>
+          </div>
+          <div className="space-y-2">
+            {(minutes.opinions || []).map((op, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={op}
+                  onChange={(e) => handleOpinionChange(idx, e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-blue-400 text-sm"
+                  placeholder="참석자 발언 또는 주요 이견"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleRemoveOpinion(idx)}
+                  className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
+                  title="삭제"
+                >
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -430,7 +503,12 @@ export default function MinutesEditor({
                   </select>
                 </div>
                 <div className="col-span-1 text-center">
-                  <button onClick={() => handleRemoveActionItem(idx)} className="text-slate-400 hover:text-red-500">
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveActionItem(idx)}
+                    className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50 transition"
+                    title="삭제"
+                  >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>

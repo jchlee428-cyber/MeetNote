@@ -43,10 +43,7 @@ export async function PUT(req: NextRequest, context: RouteContext) {
 export async function DELETE(req: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
-    const success = await deleteMeeting(id);
-    if (!success) {
-      return NextResponse.json({ error: '삭제할 회의를 찾을 수 없습니다.' }, { status: 404 });
-    }
+    await deleteMeeting(id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('DELETE /api/meetings/[id] error:', error);

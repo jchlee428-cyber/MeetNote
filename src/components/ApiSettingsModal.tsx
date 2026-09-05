@@ -47,17 +47,18 @@ export default function ApiSettingsModal({ isOpen, onClose }: ApiSettingsModalPr
     }, 1000);
   };
 
+  const [confirmClear, setConfirmClear] = useState(false);
+
   const handleClear = () => {
-    if (confirm('저장된 API 키를 삭제하시겠습니까?')) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('meetnote_openai_key');
-        localStorage.removeItem('meetnote_gemini_key');
-        localStorage.removeItem('meetnote_preferred_engine');
-      }
-      setOpenaiKey('');
-      setGeminiKey('');
-      setPreferredEngine('auto');
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('meetnote_openai_key');
+      localStorage.removeItem('meetnote_gemini_key');
+      localStorage.removeItem('meetnote_preferred_engine');
     }
+    setOpenaiKey('');
+    setGeminiKey('');
+    setPreferredEngine('auto');
+    setConfirmClear(false);
   };
 
   return (
@@ -185,12 +186,33 @@ export default function ApiSettingsModal({ isOpen, onClose }: ApiSettingsModalPr
 
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
           {(openaiKey || geminiKey) && (
-            <button
-              onClick={handleClear}
-              className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 p-2"
-            >
-              <Trash2 className="w-3.5 h-3.5" /> 삭제
-            </button>
+            confirmClear ? (
+              <div className="flex items-center gap-1.5 animate-in fade-in duration-100">
+                <span className="text-[11px] text-red-600 font-semibold">키 삭제?</span>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="px-2.5 py-1 text-xs bg-red-600 hover:bg-red-700 text-white font-bold rounded-lg transition"
+                >
+                  확인
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setConfirmClear(false)}
+                  className="px-2 py-1 text-xs text-slate-500 hover:text-slate-700 rounded-lg transition"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setConfirmClear(true)}
+                className="text-xs text-red-500 hover:text-red-700 font-medium flex items-center gap-1 p-2 rounded-lg hover:bg-red-50 transition"
+              >
+                <Trash2 className="w-3.5 h-3.5" /> 삭제
+              </button>
+            )
           )}
 
           <div className="flex items-center gap-2 ml-auto">

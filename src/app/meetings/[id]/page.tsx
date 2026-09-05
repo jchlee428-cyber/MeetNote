@@ -8,6 +8,7 @@ import MinutesViewer from '@/components/MinutesViewer';
 import MinutesEditor from '@/components/MinutesEditor';
 import TranscriptViewer from '@/components/TranscriptViewer';
 import ExportMenu from '@/components/ExportMenu';
+import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 import { MeetingRecord, MeetingMinutes } from '@/types/meeting';
 
 export default function MeetingDetailPage() {
@@ -21,6 +22,8 @@ export default function MeetingDetailPage() {
   const [activeTab, setActiveTab] = useState<'minutes' | 'transcript'>('minutes');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -70,19 +73,33 @@ export default function MeetingDetailPage() {
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm('정말로 이 회의록을 삭제하시겠습니까?\n모든 전사 내용과 회의록이 영구 삭제됩니다.')) {
-      return;
-    }
+  const handleConfirmDelete = async () => {
     try {
-      const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        router.push('/');
-      } else {
-        alert('삭제에 실패했습니다.');
+      setIsDeleting(true);
+      // 1. 클라이언트 영속성에서 즉시 제거 및 삭제된 ID(tombstone) 등록
+      if (typeof window !== 'undefined') {
+        try {
+          const deleted: string[] = JSON.parse(localStorage.getItem('meetnote_deleted_ids') || '[]');
+          if (!deleted.includes(id)) {
+            deleted.push(id);
+            localStorage.setItem('meetnote_deleted_ids', JSON.stringify(deleted));
+          }
+          const cached: MeetingRecord[] = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
+          const filtered = cached.filter((m) => m.id !== id);
+          localStorage.setItem('meetnote_cached_meetings', JSON.stringify(filtered));
+        } catch (storageErr) {
+          console.warn('Storage delete error:', storageErr);
+        }
       }
+
+      // 2. 서버에 DELETE 요청 (비동기 처리)
+      await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+
+      // 3. 홈 화면으로 즉시 완전 리프레시 이동
+      window.location.href = '/';
     } catch (err) {
-      alert('삭제 중 오류가 발생했습니다.');
+      console.error('회의 삭제 에러:', err);
+      window.location.href = '/';
     }
   };
 
@@ -130,7 +147,8 @@ export default function MeetingDetailPage() {
           </button>
 
           <button
-            onClick={handleDelete}
+            type="button"
+            onClick={() => setIsDeleteModalOpen(true)}
             className="px-3.5 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-xs sm:text-sm font-semibold transition flex items-center gap-1.5"
             title="회의 삭제"
           >
@@ -157,7 +175,6 @@ export default function MeetingDetailPage() {
         <button
           onClick={() => {
             setActiveTab('transcript');
-            setIsEditing(false);
           }}
           className={`pb-3 px-4 font-bold text-sm sm:text-base border-b-2 transition-all ${
             activeTab === 'transcript'
@@ -165,11 +182,11 @@ export default function MeetingDetailPage() {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          한국어 음성 전사 원문
+          음성 텍스트 원문 (Transcript)
         </button>
       </div>
 
-      {/* 탭 내용 */}
+      {/* 탭 내용 표시 */}
       {activeTab === 'minutes' ? (
         isEditing ? (
           <MinutesEditor
@@ -194,6 +211,16 @@ export default function MeetingDetailPage() {
           }}
         />
       )}
+
+      {/* 회의록 삭제 확인 모달 */}
+      <DeleteConfirmModal
+        isOpen={isDeleteModalOpen}
+        title="회의록 영구 삭제"
+        description="정말로 이 회의록을 삭제하시겠습니까? 전사 내용과 작성된 회의록이 영구 삭제되며 복구할 수 없습니다."
+        isDeleting={isDeleting}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setIsDeleteModalOpen(false)}
+      />
     </div>
   );
 }

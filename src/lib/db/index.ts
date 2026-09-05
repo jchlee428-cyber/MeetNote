@@ -18,10 +18,13 @@ const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey && supabaseUrl.s
 
 const supabase = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseKey!) : null;
 
+// 삭제된 ID를 추적하여 서버리스 콜드 스타트나 시드 재주입 시 부활 방지
+const serverDeletedIds = new Set<string>();
+
 // 로컬 파일 데이터베이스 헬퍼
 function ensureLocalDb(): MeetingRecord[] {
-  if (memoryCache && memoryCache.length > 0) {
-    return memoryCache;
+  if (memoryCache !== null) {
+    return memoryCache.filter((m) => !serverDeletedIds.has(m.id));
   }
 
   try {
@@ -34,8 +37,9 @@ function ensureLocalDb(): MeetingRecord[] {
         try {
           const seedContent = fs.readFileSync(SEED_FILE, 'utf-8');
           fs.writeFileSync(DATA_FILE, seedContent, 'utf-8');
-          memoryCache = JSON.parse(seedContent);
-          return memoryCache!;
+          const parsed = JSON.parse(seedContent);
+          memoryCache = Array.isArray(parsed) ? parsed.filter((m: any) => !serverDeletedIds.has(m.id)) : [];
+          return memoryCache;
         } catch (seedErr) {
           console.warn('Seed file copy error:', seedErr);
         }
@@ -274,10 +278,11 @@ export async function updateMeeting(id: string, data: Partial<MeetingRecord>): P
 
 // 회의 삭제
 export async function deleteMeeting(id: string): Promise<boolean> {
+  serverDeletedIds.add(id);
+
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase.from('meetings').delete().eq('id', id);
-      if (!error) return true;
+      await supabase.from('meetings').delete().eq('id', id);
     } catch (err) {
       console.warn('Supabase delete exception:', err);
     }
@@ -285,8 +290,6 @@ export async function deleteMeeting(id: string): Promise<boolean> {
 
   const meetings = ensureLocalDb();
   const filtered = meetings.filter((m) => m.id !== id);
-  if (filtered.length === meetings.length) return false;
-
   writeLocalDb(filtered);
   return true;
 }
