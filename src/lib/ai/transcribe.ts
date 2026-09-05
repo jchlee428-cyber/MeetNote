@@ -5,6 +5,8 @@ export interface TranscribeOptions {
   fileName: string;
   mimeType: string;
   title?: string;
+  apiKey?: string;
+  geminiKey?: string;
 }
 
 export interface TranscribeResponse {
@@ -46,8 +48,8 @@ const DEMO_TRANSCRIPT = `[장로회 및 사역위원회 정기회의 음성 전�
 사회자: 오늘 수고 많으셨습니다. 다음 정기 회의는 10월 12일 주일 오후 4시 소예배실에서 진행하겠습니다. 기도로 마치겠습니다.`;
 
 export async function transcribeAudio(options: TranscribeOptions): Promise<TranscribeResponse> {
-  const openaiKey = process.env.OPENAI_API_KEY?.trim();
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  const openaiKey = options.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
+  const geminiKey = options.geminiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
 
   // 1. OpenAI Whisper API 시도
   if (openaiKey && openaiKey !== 'your_openai_api_key_here') {

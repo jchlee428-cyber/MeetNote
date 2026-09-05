@@ -16,6 +16,7 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
   const [recordSeconds, setRecordSeconds] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
 
@@ -106,6 +107,8 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
       recorder.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: mimeType });
         setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
 
         const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('wav') ? 'wav' : 'webm';
         const file = new File([blob], `meeting_${Date.now()}.${ext}`, { type: mimeType });
@@ -165,8 +168,11 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (audioUrl) URL.revokeObjectURL(audioUrl);
       setAudioFile(file);
       setAudioBlob(file);
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
       setRecordSeconds(0);
       if (!title) {
         setTitle(file.name.replace(/\.[^/.]+$/, ''));
@@ -189,11 +195,16 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
 
   // 재녹음 하기
   const handleReset = () => {
+    if (audioUrl) {
+      URL.revokeObjectURL(audioUrl);
+    }
+    setAudioUrl(null);
     setAudioBlob(null);
     setAudioFile(null);
     setRecordSeconds(0);
     setIsRecording(false);
     setIsPaused(false);
+    setMicError(null);
   };
 
   return (
@@ -202,7 +213,10 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
       {!audioBlob && !isRecording && (
         <div className="flex bg-slate-100 p-1 rounded-2xl mb-8">
           <button
-            onClick={() => setMode('record')}
+            onClick={() => {
+              setMode('record');
+              setMicError(null);
+            }}
             className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
               mode === 'record' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
             }`}
@@ -211,7 +225,10 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
             휴대폰 마이크 녹음
           </button>
           <button
-            onClick={() => setMode('upload')}
+            onClick={() => {
+              setMode('upload');
+              setMicError(null);
+            }}
             className={`flex-1 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 ${
               mode === 'upload' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
             }`}
@@ -222,8 +239,8 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
         </div>
       )}
 
-      {/* 마이크 권한 에러 알림 */}
-      {micError && (
+      {/* 마이크 권한 에러 알림 (녹음 모드일 때만 표시) */}
+      {mode === 'record' && micError && (
         <div className="mb-6 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm flex items-start gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
           <div>
@@ -366,6 +383,14 @@ export default function AudioRecorder({ onRecordingComplete, disabled = false }:
               </div>
             </div>
           </div>
+
+          {/* 녹음 음성 미리듣기 */}
+          {audioUrl && (
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex flex-col gap-1.5">
+              <span className="text-xs font-semibold text-slate-600">녹음된 음성 미리듣기</span>
+              <audio controls src={audioUrl} className="w-full h-10" />
+            </div>
+          )}
 
           {/* 메타데이터 입력 폼 */}
           <div className="space-y-4">

@@ -5,14 +5,16 @@ import { MEETING_MINUTES_SYSTEM_PROMPT, buildUserPrompt } from './prompt';
 export interface GenerateMinutesOptions {
   transcript: string;
   basicInfo?: Partial<MeetingBasicInfo>;
+  apiKey?: string;
+  geminiKey?: string;
 }
 
 export async function generateMeetingMinutes(
   options: GenerateMinutesOptions
 ): Promise<{ minutes: MeetingMinutes; provider: string }> {
   const { transcript, basicInfo } = options;
-  const openaiKey = process.env.OPENAI_API_KEY?.trim();
-  const geminiKey = process.env.GEMINI_API_KEY?.trim();
+  const openaiKey = options.apiKey?.trim() || process.env.OPENAI_API_KEY?.trim();
+  const geminiKey = options.geminiKey?.trim() || process.env.GEMINI_API_KEY?.trim();
 
   const userPrompt = buildUserPrompt(transcript, {
     title: basicInfo?.title,

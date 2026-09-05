@@ -19,10 +19,44 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
     try {
       setLoading(true);
       const res = await fetch(`/api/meetings?q=${encodeURIComponent(q)}`);
+      let list: MeetingRecord[] = [];
       if (res.ok) {
         const data = await res.json();
-        setMeetings(data.meetings || []);
+        list = data.meetings || [];
       }
+
+      // 클라이언트 로컬 저장소와 병합하여 서버리스 재시작 시에도 회의록 보존
+      if (typeof window !== 'undefined') {
+        try {
+          const cached: MeetingRecord[] = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
+          const map = new Map<string, MeetingRecord>();
+          list.forEach((m) => map.set(m.id, m));
+          cached.forEach((m) => {
+            if (!map.has(m.id)) {
+              map.set(m.id, m);
+            }
+          });
+          list = Array.from(map.values()).sort(
+            (a, b) => new Date(b.meeting_date).getTime() - new Date(a.meeting_date).getTime()
+          );
+          localStorage.setItem('meetnote_cached_meetings', JSON.stringify(list));
+        } catch (cErr) {}
+      }
+
+      if (q.trim()) {
+        const lower = q.toLowerCase().trim();
+        list = list.filter((m) => {
+          return (
+            m.title?.toLowerCase().includes(lower) ||
+            m.participants?.toLowerCase().includes(lower) ||
+            m.location?.toLowerCase().includes(lower) ||
+            m.transcript?.toLowerCase().includes(lower) ||
+            JSON.stringify(m.minutes || '').toLowerCase().includes(lower)
+          );
+        });
+      }
+
+      setMeetings(list);
     } catch (err) {
       console.error('회의 목록 조회 실패:', err);
     } finally {
@@ -47,11 +81,14 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
     }
 
     try {
-      const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        setMeetings((prev) => prev.filter((m) => m.id !== id));
-      } else {
-        alert('회의 삭제에 실패했습니다.');
+      await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+      setMeetings((prev) => prev.filter((m) => m.id !== id));
+      if (typeof window !== 'undefined') {
+        try {
+          const cached: MeetingRecord[] = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
+          const filtered = cached.filter((m) => m.id !== id);
+          localStorage.setItem('meetnote_cached_meetings', JSON.stringify(filtered));
+        } catch (cErr) {}
       }
     } catch (err) {
       console.error('회의 삭제 에러:', err);

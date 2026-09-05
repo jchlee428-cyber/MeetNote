@@ -4,8 +4,12 @@ import { createClient } from '@supabase/supabase-js';
 import { MeetingRecord } from '@/types/meeting';
 import { v4 as uuidv4 } from 'uuid';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
+const isVercel = Boolean(process.env.VERCEL);
+const DATA_DIR = isVercel ? '/tmp' : path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'meetings.json');
+const SEED_FILE = path.join(process.cwd(), 'data', 'meetings.json');
+
+let memoryCache: MeetingRecord[] | null = null;
 
 // Supabase 클라이언트 (환경변수 존재 시에만 초기화)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -16,11 +20,26 @@ const supabase = isSupabaseConfigured ? createClient(supabaseUrl!, supabaseKey!)
 
 // 로컬 파일 데이터베이스 헬퍼
 function ensureLocalDb(): MeetingRecord[] {
+  if (memoryCache && memoryCache.length > 0) {
+    return memoryCache;
+  }
+
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(DATA_FILE)) {
+      // 만약 패키징된 SEED_FILE이 존재하면 이를 /tmp로 복사
+      if (fs.existsSync(SEED_FILE)) {
+        try {
+          const seedContent = fs.readFileSync(SEED_FILE, 'utf-8');
+          fs.writeFileSync(DATA_FILE, seedContent, 'utf-8');
+          memoryCache = JSON.parse(seedContent);
+          return memoryCache!;
+        } catch (seedErr) {
+          console.warn('Seed file copy error:', seedErr);
+        }
+      }
       // 초기 샘플 데이터 세팅
       const initialData: MeetingRecord[] = [
         {
@@ -97,24 +116,27 @@ function ensureLocalDb(): MeetingRecord[] {
         },
       ];
       fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
+      memoryCache = initialData;
       return initialData;
     }
     const content = fs.readFileSync(DATA_FILE, 'utf-8');
-    return JSON.parse(content || '[]');
+    memoryCache = JSON.parse(content || '[]');
+    return memoryCache!;
   } catch (err) {
     console.error('Local DB read error:', err);
-    return [];
+    return memoryCache || [];
   }
 }
 
 function writeLocalDb(meetings: MeetingRecord[]): void {
+  memoryCache = meetings;
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     fs.writeFileSync(DATA_FILE, JSON.stringify(meetings, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Local DB write error:', err);
+    console.error('Local DB write error (will use in-memory state):', err);
   }
 }
 

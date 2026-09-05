@@ -17,11 +17,16 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
+    const apiKey = req.headers.get('x-openai-key') || undefined;
+    const geminiKey = req.headers.get('x-gemini-key') || undefined;
+
     const result = await transcribeAudio({
       audioBuffer: buffer,
       fileName: file.name || 'audio.webm',
       mimeType: file.type || 'audio/webm',
       title,
+      apiKey,
+      geminiKey,
     });
 
     return NextResponse.json({

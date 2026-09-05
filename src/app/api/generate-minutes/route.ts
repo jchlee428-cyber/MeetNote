@@ -13,9 +13,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: '전사된 한국어 텍스트가 없습니다.' }, { status: 400 });
     }
 
+    const apiKey = req.headers.get('x-openai-key') || undefined;
+    const geminiKey = req.headers.get('x-gemini-key') || undefined;
+
     const result = await generateMeetingMinutes({
       transcript: transcript.trim(),
       basicInfo,
+      apiKey,
+      geminiKey,
     });
 
     return NextResponse.json({

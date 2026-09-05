@@ -55,8 +55,17 @@ export default function RecordPage() {
 
       // 3단계: 한국어 전사 API 호출
       setStep('transcribing');
+      const transcribeHeaders: Record<string, string> = {};
+      if (typeof window !== 'undefined') {
+        const oKey = localStorage.getItem('meetnote_openai_key');
+        const gKey = localStorage.getItem('meetnote_gemini_key');
+        if (oKey) transcribeHeaders['x-openai-key'] = oKey;
+        if (gKey) transcribeHeaders['x-gemini-key'] = gKey;
+      }
+
       const res = await fetch('/api/transcribe', {
         method: 'POST',
+        headers: transcribeHeaders,
         body: formData,
       });
 
@@ -89,9 +98,17 @@ export default function RecordPage() {
       setErrorMessage(null);
 
       const targetMeta = meta || basicMeta;
+      const minutesHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (typeof window !== 'undefined') {
+        const oKey = localStorage.getItem('meetnote_openai_key');
+        const gKey = localStorage.getItem('meetnote_gemini_key');
+        if (oKey) minutesHeaders['x-openai-key'] = oKey;
+        if (gKey) minutesHeaders['x-gemini-key'] = gKey;
+      }
+
       const res = await fetch('/api/generate-minutes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: minutesHeaders,
         body: JSON.stringify({
           transcript: sourceText,
           basicInfo: {
@@ -126,7 +143,19 @@ export default function RecordPage() {
 
       if (saveRes.ok) {
         const savedData = await saveRes.json();
-        setSavedMeetingId(savedData.meeting?.id);
+        if (savedData.meeting) {
+          setSavedMeetingId(savedData.meeting.id);
+          if (typeof window !== 'undefined') {
+            try {
+              const existing = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
+              const filtered = existing.filter((m: any) => m.id !== savedData.meeting.id);
+              filtered.unshift(savedData.meeting);
+              localStorage.setItem('meetnote_cached_meetings', JSON.stringify(filtered));
+            } catch (cacheErr) {
+              console.warn('LocalStorage cache write error:', cacheErr);
+            }
+          }
+        }
       }
 
       setStep('completed');
@@ -157,6 +186,20 @@ export default function RecordPage() {
             minutes: updatedMinutes,
           }),
         });
+
+        if (typeof window !== 'undefined') {
+          try {
+            const existing = JSON.parse(localStorage.getItem('meetnote_cached_meetings') || '[]');
+            const idx = existing.findIndex((m: any) => m.id === savedMeetingId);
+            if (idx !== -1) {
+              existing[idx].title = updatedMinutes.basicInfo?.title || existing[idx].title;
+              existing[idx].location = updatedMinutes.basicInfo?.location || existing[idx].location;
+              existing[idx].participants = updatedMinutes.basicInfo?.attendees || existing[idx].participants;
+              existing[idx].minutes = updatedMinutes;
+              localStorage.setItem('meetnote_cached_meetings', JSON.stringify(existing));
+            }
+          } catch (cErr) {}
+        }
       }
 
       setIsEditing(false);
