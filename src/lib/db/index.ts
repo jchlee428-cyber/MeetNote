@@ -3,11 +3,11 @@ import path from 'path';
 import { createClient } from '@supabase/supabase-js';
 import { MeetingRecord } from '@/types/meeting';
 import { v4 as uuidv4 } from 'uuid';
+import defaultSeedData from '../../../data/meetings.json';
 
 const isVercel = Boolean(process.env.VERCEL);
 const DATA_DIR = isVercel ? '/tmp' : path.join(process.cwd(), 'data');
 const DATA_FILE = path.join(DATA_DIR, 'meetings.json');
-const SEED_FILE = path.join(process.cwd(), 'data', 'meetings.json');
 
 let memoryCache: MeetingRecord[] | null = null;
 
@@ -32,96 +32,14 @@ function ensureLocalDb(): MeetingRecord[] {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
     if (!fs.existsSync(DATA_FILE)) {
-      // 만약 패키징된 SEED_FILE이 존재하면 이를 /tmp로 복사
-      if (fs.existsSync(SEED_FILE)) {
-        try {
-          const seedContent = fs.readFileSync(SEED_FILE, 'utf-8');
-          fs.writeFileSync(DATA_FILE, seedContent, 'utf-8');
-          const parsed = JSON.parse(seedContent);
-          memoryCache = Array.isArray(parsed) ? parsed.filter((m: any) => !serverDeletedIds.has(m.id)) : [];
-          return memoryCache;
-        } catch (seedErr) {
-          console.warn('Seed file copy error:', seedErr);
-        }
+      const initialData: MeetingRecord[] = (defaultSeedData as unknown as MeetingRecord[]) || [];
+      try {
+        fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
+      } catch (writeErr) {
+        console.warn('Initial data write error:', writeErr);
       }
-      // 초기 샘플 데이터 세팅
-      const initialData: MeetingRecord[] = [
-        {
-          id: 'demo-sample-meeting-1',
-          title: '2026년 9월 당회 및 장로회 정기 회의',
-          meeting_date: '2026-09-05T14:00:00.000Z',
-          location: '교회 1층 만나홀',
-          participants: '김철수 장로, 이영희 권사, 박진우 집사, 최성호 총무',
-          audio_url: '',
-          transcript: '가을 바자회 일정 확정 및 본당 음향 시설 교체 예산안 논의...',
-          minutes: {
-            basicInfo: {
-              title: '2026년 9월 당회 및 장로회 정기 회의',
-              dateTime: '2026.09.05 14:00',
-              location: '교회 1층 만나홀',
-              attendees: '김철수 장로, 이영희 권사, 박진우 집사, 최성호 총무',
-              objective: '가을 바자회 일정 확정 및 음향 시설 개선 예산 검토',
-            },
-            agenda: [
-              '1. 가을 바자회 및 이웃나눔 행사 일정/장소 확정',
-              '2. 본당 음향 및 빔프로젝터 노후화 개선 예산안 검토',
-              '3. 다문화 청소년 멘토링 프로그램 추진',
-            ],
-            discussions: [
-              {
-                agendaNumber: 1,
-                topic: '가을 바자회 일정 및 장소',
-                summary: '10월 25일 지역 축제 중복을 피해 10월 18일(토) 교회 마당 및 만나홀에서 개최키로 논의함.',
-              },
-              {
-                agendaNumber: 2,
-                topic: '본당 음향 시설 예산안',
-                summary: '450만 원 견적에 대해 예비비 한도 고려하여 스피커 우선 교체 후 분할 추진 논의.',
-              },
-            ],
-            decisions: [
-              '가을 바자회는 10월 18일(토) 10:00~16:00 개최로 만장일치 가결함.',
-              '다문화 멘토링 자원봉사자 모집 안내문을 주보에 게시하기로 결정함.',
-            ],
-            unresolved: [
-              '음향 시설 교체 450만 원 건은 재정위원회와 분할 납부 협의 후 다음 임시회에서 재논의하기로 보류함.',
-            ],
-            opinions: [
-              '음향 전면 교체(450만 원) vs 스피커 우선 교체(250만 원) 후 차기 분할 교체안 이견 존재.',
-            ],
-            actionItems: [
-              {
-                task: '가을 바자회 장소 대관 및 안전 점검',
-                assignee: '홍길동 집사',
-                dueDate: '9월 20일',
-                status: '예정',
-              },
-              {
-                task: '음향 시설 업체 견적 분할 납부 협의',
-                assignee: '최성호 총무',
-                dueDate: '9월 22일',
-                status: '진행중',
-              },
-              {
-                task: '다문화 멘토 모집 안내문 주보 게시',
-                assignee: '박진우 집사',
-                dueDate: '9월 25일',
-                status: '예정',
-              },
-            ],
-            nextMeeting: {
-              dateTime: '2026년 10월 12일(주일) 16:00',
-              location: '소예배실',
-              note: '바자회 준비 최종 점검',
-            },
-          },
-          created_at: '2026-09-05T05:00:00.000Z',
-          updated_at: '2026-09-05T05:00:00.000Z',
-        },
-      ];
-      fs.writeFileSync(DATA_FILE, JSON.stringify(initialData, null, 2), 'utf-8');
-      memoryCache = initialData;
-      return initialData;
+      memoryCache = initialData.filter((m) => !serverDeletedIds.has(m.id));
+      return memoryCache;
     }
     const content = fs.readFileSync(DATA_FILE, 'utf-8');
     memoryCache = JSON.parse(content || '[]');

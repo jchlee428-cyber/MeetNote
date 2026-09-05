@@ -184,6 +184,17 @@ export default function ApiSettingsModal({ isOpen, onClose }: ApiSettingsModalPr
           </p>
         </div>
 
+        {/* 기기 간 실시간 동기화 안내 */}
+        <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs">
+          <div className="flex items-center gap-1.5 font-bold text-slate-800 mb-1">
+            <Sparkles className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>크롬 · 엣지 · 스마트폰 간 실시간 동기화 (Supabase)</span>
+          </div>
+          <p className="text-slate-500 leading-relaxed text-[11px]">
+            현재는 각 브라우저의 독립 저장소를 사용하므로 크롬과 엣지, 스마트폰 간에 저장된 내용이 다를 수 있습니다. 모든 기기에서 동일한 회의록을 실시간 공유하려면 Vercel 환경변수에 Supabase 무료 DB 키를 등록하시면 즉시 완전 동기화됩니다.
+          </p>
+        </div>
+
         <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between gap-2">
           {(openaiKey || geminiKey) && (
             confirmClear ? (

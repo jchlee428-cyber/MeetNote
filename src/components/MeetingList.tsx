@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MeetingRecord } from '@/types/meeting';
-import { Search, Calendar, MapPin, Users, ChevronRight, Trash2, FileText, Sparkles } from 'lucide-react';
+import { Search, Calendar, MapPin, Users, ChevronRight, Trash2, FileText, Sparkles, RotateCcw } from 'lucide-react';
 import DeleteConfirmModal from '@/components/DeleteConfirmModal';
 
 interface MeetingListProps {
@@ -79,6 +79,18 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
     }
   };
 
+  const handleResetDefaults = async () => {
+    try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('meetnote_deleted_ids');
+        localStorage.removeItem('meetnote_cached_meetings');
+      }
+      await fetchMeetings('');
+    } catch (e) {
+      console.error('Reset error:', e);
+    }
+  };
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchMeetings(searchQuery);
@@ -130,24 +142,35 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
 
   return (
     <div className="w-full">
-      {/* 검색창 */}
-      <div className="relative mb-6">
-        <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="회의 제목, 날짜, 참석자, 안건, 전사 내용으로 검색..."
-          className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-100 text-slate-800 text-base shadow-xs placeholder:text-slate-400"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600"
-          >
-            초기화
-          </button>
-        )}
+      {/* 검색창 & 새로고침 버튼 */}
+      <div className="flex items-center gap-2 mb-6">
+        <div className="relative flex-1">
+          <Search className="w-5 h-5 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="회의 제목, 날짜, 참석자, 안건, 전사 내용으로 검색..."
+            className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-white border border-slate-200 focus:outline-none focus:ring-4 focus:ring-blue-100 text-slate-800 text-base shadow-xs placeholder:text-slate-400"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 hover:text-slate-600"
+            >
+              초기화
+            </button>
+          )}
+        </div>
+        <button
+          type="button"
+          onClick={() => fetchMeetings(searchQuery)}
+          title="회의 목록 새로고침"
+          disabled={loading}
+          className="p-3.5 rounded-2xl bg-white border border-slate-200 text-slate-500 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50/50 shadow-xs transition shrink-0 active:scale-95 disabled:opacity-50"
+        >
+          <RotateCcw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       {/* 목록 리스트 */}
@@ -157,14 +180,27 @@ export default function MeetingList({ initialMeetings = [] }: MeetingListProps) 
         <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 p-8">
           <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
           <h3 className="text-lg font-bold text-slate-700">저장된 회의록이 없습니다</h3>
-          <p className="text-xs text-slate-400 mt-1">상단의 &apos;새 회의 녹음&apos; 버튼을 눌러 첫 번째 회의를 기록해보세요.</p>
-          <Link
-            href="/record"
-            className="inline-flex items-center gap-2 mt-5 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition"
-          >
-            <Sparkles className="w-4 h-4 text-amber-300" />
-            회의 녹음 시작하기
-          </Link>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            상단의 &apos;새 회의 녹음&apos; 버튼으로 새로운 회의를 기록하거나, 이전 삭제 내역을 초기화하여 기본 회의록을 다시 불러올 수 있습니다.
+          </p>
+          <div className="mt-5 flex items-center justify-center gap-3 flex-wrap">
+            <Link
+              href="/record"
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-sm transition"
+            >
+              <Sparkles className="w-4 h-4 text-amber-300" />
+              회의 녹음 시작하기
+            </Link>
+            <button
+              type="button"
+              onClick={handleResetDefaults}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-sm transition border border-slate-200 shadow-2xs active:scale-95"
+              title="브라우저에 저장된 삭제 기록을 초기화하고 기본 회의록을 다시 불러옵니다"
+            >
+              <RotateCcw className="w-4 h-4 text-slate-500" />
+              기본 회의록 다시 불러오기
+            </button>
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3.5">
